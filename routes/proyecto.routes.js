@@ -7,8 +7,7 @@ import {
   editarProyecto,
   eliminarProyecto,
   agregarColaborador,
-  eliminarColaborador,
-  obtenerTareas
+  eliminarColaborador
 } from '../controllers/proyecto.controllers.js'
 
 const router = express.Router()
@@ -16,7 +15,6 @@ const router = express.Router()
 router.route('/').get(obtenerProyectos).post(nuevoProyecto)
 router.route('/:id').get(obtenerProyecto).put(editarProyecto).delete(eliminarProyecto)
 
-router.get('/tareas/:id', obtenerTareas)
 router.post('/agregar-colaborador/:id', agregarColaborador)
 router.post('/eliminar-colaborador/:id', eliminarColaborador)
 
