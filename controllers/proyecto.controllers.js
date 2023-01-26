@@ -42,7 +42,7 @@ export const obtenerProyecto = async (req, res) => {
 
     const tareas = await Tarea.find({ proyecto: proyecto._id })
 
-    return res.json({ proyecto, tareas })
+    return res.json({ ...proyecto._doc, tareas })
   } catch (error) {
     return res.status(500).json({ message: error })
   }
