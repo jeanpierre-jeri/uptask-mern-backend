@@ -19,6 +19,8 @@ export const agregarTarea = async (req, res) => {
 
   try {
     const tarea = await Tarea.create(req.body)
+    proyecto.tareas.push(tarea._id)
+    await proyecto.save()
     return res.json(tarea)
   } catch (error) {
     return res.status(500).json({ message: error.message })
