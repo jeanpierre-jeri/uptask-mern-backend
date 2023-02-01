@@ -4,7 +4,9 @@ import { idMongooseValida } from '../helpers/validarMongoose.js'
 
 export const obtenerProyectos = async (req, res) => {
   try {
-    const proyectos = await Proyecto.find({ creador: req.usuario._id }).select('-tareas')
+    const proyectos = await Proyecto.find({
+      $or: [{ colaboradores: { $in: req.usuario._id } }, { creador: { $in: req.usuario._id } }]
+    }).select('-tareas')
     return res.json(proyectos)
   } catch (error) {
     return res.status(500).json({ message: error.message })
@@ -32,18 +34,31 @@ export const obtenerProyecto = async (req, res) => {
 
   try {
     const proyecto = await Proyecto.findById(id)
-      .where('creador')
-      .equals(req.usuario._id)
-      .populate({ path: 'tareas', options: { sort: { updatedAt: -1 } } })
+      .populate({
+        path: 'tareas',
+        options: { sort: { updatedAt: -1 } },
+        populate: { path: 'completado', select: 'nombre _id' }
+      })
+      .populate('colaboradores', 'nombre email')
 
     if (!proyecto) {
       const error = new Error('No se encontro el proyecto')
       return res.status(404).json({ message: error.message })
     }
 
+    const idTokenUser = req.usuario._id.toString()
+
+    if (
+      proyecto.creador.toString() !== idTokenUser &&
+      !proyecto.colaboradores.some(({ _id }) => _id.toString() === idTokenUser)
+    ) {
+      const error = new Error('Acción no Válida')
+      return res.status(401).json({ message: error.message })
+    }
+
     return res.json(proyecto)
   } catch (error) {
-    return res.status(500).json({ message: error })
+    return res.status(500).json({ message: error.message })
   }
 }
 
@@ -155,4 +170,45 @@ export const agregarColaborador = async (req, res) => {
   }
 }
 
-export const eliminarColaborador = async (req, res) => {}
+export const eliminarColaborador = async (req, res) => {
+  const { id } = req.params
+  const { colaboradorId } = req.query
+
+  if (!idMongooseValida(id)) {
+    return res.status(400).json({ message: 'Id de proyecto no válida' })
+  }
+
+  if (!idMongooseValida(colaboradorId)) {
+    return res.status(400).json({ message: 'Id de colaborador no válida' })
+  }
+
+  try {
+    const proyecto = await Proyecto.findById(id)
+
+    if (!proyecto) {
+      const error = new Error('Proyecto no encontrado')
+      return res.status(404).json({ message: error.message })
+    }
+
+    // Se valida que no se puede eliminar
+    // al creador del proyecto
+    if (proyecto.creador.toString() === colaboradorId.toString()) {
+      const error = new Error('El creador del Proyecto no puede ser eliminado')
+      return res.status(400).json({ message: error.message })
+    }
+
+    // Valida que el colaborador no este ya en el proyecto
+    if (!proyecto.colaboradores.includes(colaboradorId)) {
+      const error = new Error('El usuario no pertenece al proyecto')
+      return res.status(400).json({ message: error.message })
+    }
+
+    proyecto.colaboradores.pull(colaboradorId)
+
+    await proyecto.save()
+
+    return res.json({ message: 'Colaborador eliminado correctamente' })
+  } catch (error) {
+    return res.status(500).json({ message: error.message })
+  }
+}
